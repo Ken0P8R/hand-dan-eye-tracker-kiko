@@ -1,2 +1,3 @@
 # hand-dan-eye-tracker-kiko
-iseng doang wir
+
+Hand & Eye Tracker/Detector by Kiko
