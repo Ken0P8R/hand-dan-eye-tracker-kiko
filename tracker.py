@@ -15,6 +15,11 @@ face_mesh = mp_face_mesh.FaceMesh(max_num_faces=1, refine_landmarks=True,
 
 cap = cv2.VideoCapture(0)
 
+# TURUNKAN RESOLUSI AGAR LEBIH RINGAN
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+cap.set(cv2.CAP_PROP_FPS, 30)
+
 LEFT_EYE_IDX = [33, 7, 163, 144, 145, 153, 154, 155,
                 133, 173, 157, 158, 159, 160, 161, 246]
 RIGHT_EYE_IDX = [362, 382, 381, 380, 374, 373, 390, 249,
@@ -28,7 +33,7 @@ def is_finger_up(hand_landmarks, tip, pip, handedness):
     if tip == mp_hands.HandLandmark.THUMB_TIP:
         wrist_x = hand_landmarks.landmark[mp_hands.HandLandmark.WRIST].x
         thumb_tip_x = hand_landmarks.landmark[tip].x
-        return thumb_tip_x < wrist_x if handedness == 'Right' else thumb_tip_x > wrist_x
+        return thumb_tip_x < wrist_x if handedness == "Right" else thumb_tip_x > wrist_x
     return hand_landmarks.landmark[tip].y < hand_landmarks.landmark[pip].y
 
 def is_only_middle_finger_up(hand_landmarks, handedness):
@@ -58,10 +63,9 @@ while cap.isOpened():
     results_pose = pose.process(frame_rgb)
     results_face = face_mesh.process(frame_rgb)
 
-    status_tangan = {'Right': 'Tidak terdeteksi', 'Left': 'Tidak terdeteksi'}
+    status_tangan = {"Right": "Tidak terdeteksi", "Left": "Tidak terdeteksi"}
     jari_tengah_only_terdeteksi = False
 
-    # Gambar mata dengan garis merah
     if results_face.multi_face_landmarks:
         for face_landmarks in results_face.multi_face_landmarks:
             pts_left = [(int(face_landmarks.landmark[i].x * w), int(face_landmarks.landmark[i].y * h)) for i in LEFT_EYE_IDX]
@@ -69,7 +73,6 @@ while cap.isOpened():
             cv2.polylines(frame, [np.array(pts_left, dtype=np.int32)], isClosed=True, color=(0, 0, 255), thickness=1)
             cv2.polylines(frame, [np.array(pts_right, dtype=np.int32)], isClosed=True, color=(0, 0, 255), thickness=1)
 
-    # Gambar tangan dengan warna cyan dan titik putih, garis tipis
     if results_hands.multi_hand_landmarks and results_hands.multi_handedness:
         for idx, hand_landmarks in enumerate(results_hands.multi_hand_landmarks):
             handedness = results_hands.multi_handedness[idx].classification[0].label
@@ -83,31 +86,27 @@ while cap.isOpened():
                 [mp_hands.HandLandmark.THUMB_IP, mp_hands.HandLandmark.INDEX_FINGER_PIP, mp_hands.HandLandmark.MIDDLE_FINGER_PIP,
                  mp_hands.HandLandmark.RING_FINGER_PIP, mp_hands.HandLandmark.PINKY_PIP])]
 
-            status = 'Terbuka' if sum(fingers_status) >= 4 else 'Tertutup'
+            status = "Terbuka" if sum(fingers_status) >= 4 else "Tertutup"
             status_tangan[handedness] = status
 
-            # Gambar landmark tangan & sambungan
             mp_drawing.draw_landmarks(
                 frame, hand_landmarks, mp_hands.HAND_CONNECTIONS,
-                mp_drawing.DrawingSpec(color=(255, 255, 255), thickness=2, circle_radius=4),  # titik putih
-                mp_drawing.DrawingSpec(color=(255, 255, 0), thickness=2)  # garis cyan
+                mp_drawing.DrawingSpec(color=(255, 255, 255), thickness=1, circle_radius=2),
+                mp_drawing.DrawingSpec(color=(255, 255, 0), thickness=1)
             )
 
-            # Garis dari wrist ke pangkal jari
             wrist = hand_landmarks.landmark[0]
-            for landmark_id in [1, 5, 9, 13, 17]:  # pangkal jari
+            for landmark_id in [1, 5, 9, 13, 17]:
                 joint = hand_landmarks.landmark[landmark_id]
                 x1, y1 = int(wrist.x * w), int(wrist.y * h)
                 x2, y2 = int(joint.x * w), int(joint.y * h)
-                cv2.line(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)  # cyan
+                cv2.line(frame, (x1, y1), (x2, y2), (255, 255, 0), 1)
 
-    # Gambar lengan bawah dan atas (wrist → elbow → shoulder)
     if results_pose.pose_landmarks:
         landmarks = results_pose.pose_landmarks.landmark
 
-        # Kita gambar untuk kedua sisi
-        for side in ['left', 'right']:
-            if side == 'left':
+        for side in ["left", "right"]:
+            if side == "left":
                 wrist_id, elbow_id, shoulder_id = 15, 13, 11
             else:
                 wrist_id, elbow_id, shoulder_id = 16, 14, 12
@@ -116,30 +115,28 @@ while cap.isOpened():
             elbow = landmarks[elbow_id]
             shoulder = landmarks[shoulder_id]
 
-            # Pastikan landmark terlihat cukup confident (visibility > 0.5)
             if wrist.visibility > 0.5 and elbow.visibility > 0.5:
                 x1, y1 = int(wrist.x * w), int(wrist.y * h)
                 x2, y2 = int(elbow.x * w), int(elbow.y * h)
-                cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)  # garis merah lengan bawah
+                cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
             if elbow.visibility > 0.5 and shoulder.visibility > 0.5:
                 x1, y1 = int(elbow.x * w), int(elbow.y * h)
                 x2, y2 = int(shoulder.x * w), int(shoulder.y * h)
-                cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)  # garis merah lengan atas
+                cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
-    # Teks status tangan dengan outline hitam
-    draw_text_with_outline(frame, f'Tangan Kanan: {status_tangan["Right"]}', (10, 30),
+    draw_text_with_outline(frame, f"Tangan Kanan: {status_tangan['Right']}", (10, 30),
                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, (0, 0, 0), 2)
-    draw_text_with_outline(frame, f'Tangan Kiri: {status_tangan["Left"]}', (10, 70),
+    draw_text_with_outline(frame, f"Tangan Kiri: {status_tangan['Left']}", (10, 70),
                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, (0, 0, 0), 2)
 
-    cv2.imshow('Hand, Arm & Eye Tracker', frame)
+    cv2.imshow("Hand, Arm & Eye Tracker", frame)
 
     if jari_tengah_only_terdeteksi:
         print("pakyu coding.")
         break
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
 cap.release()
